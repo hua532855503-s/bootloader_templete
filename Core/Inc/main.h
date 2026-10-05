@@ -44,6 +44,9 @@ typedef struct {
 typedef struct {
   uint8_t Update_buf[FLASH_PAGE_SIZE];
   uint32_t W25Q64_Blook;
+  uint32_t Xmodem_Timer;
+  uint32_t Xmodem_Num;
+  uint32_t Xmodem_CRC;
 } Update_Setting;
 /* USER CODE END ET */
 
@@ -71,14 +74,19 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 #define FLASH_START_ADDR              0x08000000
 #define FLASH_PAGE_NUMBER             64
-#define FLASH_PAGEB_NUMBER            28
+#define FLASH_PAGEB_NUMBER            34
 #define FLASH_PAGEA_NUMBER            (FLASH_PAGE_NUMBER - FLASH_PAGEB_NUMBER)
 #define FLASH_PAGEA_START_ADDR        (FLASH_START_ADDR + FLASH_PAGEB_NUMBER * FLASH_PAGE_SIZE)
 
 #define OTA_SET_FLAG                  0xAABB1122
 #define OTA_SETTING_SIZE              sizeof(OTA_Setting)
 
+#define XMODEM_ACK                    0x06
+#define XMODEM_NAK                    0x15
+
 #define UPDATEA_FLAG                  0x00000001
+#define XMODEMC_FLAG                  0x00000002
+#define XMODEMD_FLAG                  0x00000004
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

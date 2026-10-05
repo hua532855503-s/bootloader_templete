@@ -110,16 +110,29 @@ int main(void)
   IIC_Init();
   W25Q64_Init();
   AT24C02_Read_OTASetting();
-  Bootloader_Branch();
+  
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, UART2_RX_BUF, UART_RX_SIZE);
   __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
-  printf("system init complete\r\n");
+
+  Bootloader_Branch();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    Delay_ms(10);
+
+    if (UART2_RX_data.out != UART2_RX_data.in)      //判断是否有数据接收
+    {
+      Bootloader_Event(UART2_RX_data.out->start, UART2_RX_data.out->end - UART2_RX_data.out->start + 1);
+      UART2_RX_data.out++;
+      if (UART2_RX_data.out == UART2_RX_data.end)
+      {
+        UART2_RX_data.out = UART2_RX_data.data;
+      }
+    }
+
     if (Boot_Flag & UPDATEA_FLAG)      //判断是否需要更新A分区
     {
       uint32_t len = OTA_Info.File_Size[Update_Info.W25Q64_Blook];
@@ -151,6 +164,16 @@ int main(void)
         printf("长度错误\r\n");
         Boot_Flag &= ~UPDATEA_FLAG;
       }
+    }
+
+    if (Boot_Flag & XMODEMC_FLAG)
+    {
+      if (Update_Info.Xmodem_Timer >= 100)
+      {
+        printf("C\r\n");
+        Update_Info.Xmodem_Timer = 0;
+      }
+      Update_Info.Xmodem_Timer++;
     }
     /* USER CODE END WHILE */
 
