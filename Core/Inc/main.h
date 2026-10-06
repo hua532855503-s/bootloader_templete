@@ -38,12 +38,13 @@ extern "C" {
 /* USER CODE BEGIN ET */
 typedef struct {
   uint32_t OTA_Flag;
-  uint32_t File_Size[3];
+  uint32_t File_Size[11];
+  uint8_t OTA_Ver[32];
 } OTA_Setting;
 
 typedef struct {
   uint8_t Update_buf[FLASH_PAGE_SIZE];
-  uint32_t W25Q64_Blook;
+  uint32_t W25Q64_Block;
   uint32_t Xmodem_Timer;
   uint32_t Xmodem_Num;
   uint32_t Xmodem_CRC;
@@ -74,7 +75,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 #define FLASH_START_ADDR              0x08000000
 #define FLASH_PAGE_NUMBER             64
-#define FLASH_PAGEB_NUMBER            34
+#define FLASH_PAGEB_NUMBER            38
 #define FLASH_PAGEA_NUMBER            (FLASH_PAGE_NUMBER - FLASH_PAGEB_NUMBER)
 #define FLASH_PAGEA_START_ADDR        (FLASH_START_ADDR + FLASH_PAGEB_NUMBER * FLASH_PAGE_SIZE)
 
@@ -85,8 +86,12 @@ void Error_Handler(void);
 #define XMODEM_NAK                    0x15
 
 #define UPDATEA_FLAG                  0x00000001
-#define XMODEMC_FLAG                  0x00000002
-#define XMODEMD_FLAG                  0x00000004
+#define IAP_XMODEMC_FLAG              0x00000002
+#define IAP_XMODEMD_FLAG              0x00000004
+#define SET_VER_FLAG                  0x00000008
+#define OUTFLASH_DOWNLOAD_FLAG        0x00000010
+#define FLASH_DOWNLOAD_FLAG           0x00000020
+#define OUTFLASH_XMODEM_FLAG          0x00000040
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

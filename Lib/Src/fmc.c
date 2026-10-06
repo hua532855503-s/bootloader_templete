@@ -1,4 +1,5 @@
 #include "fmc.h"
+#include <string.h>
 
 void STM32_Erase_Flash(uint16_t start, uint16_t num)
 {
@@ -14,7 +15,7 @@ void STM32_Erase_Flash(uint16_t start, uint16_t num)
   uint32_t pageError = 0;
   if (HAL_FLASHEx_Erase(&eraseInitStruct, &pageError) != HAL_OK)
   {
-      // pageError 保存出错的页地址（成功为 0xFFFFFFFF）
+    printf("Flash Erase Error: %lu\r\n", pageError);
   }
 
   HAL_FLASH_Lock();
@@ -24,12 +25,22 @@ void STM32_Write_Flash(uint32_t addr, uint32_t *data, uint32_t num)
 {
   HAL_FLASH_Unlock();
 
-  while (num)
+  uint8_t *bytes = (uint8_t *)data;
+  while (num >= 4)
   {
-    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr, *data);
-    num   -=  4;
-    addr  +=  4;
-    data  ++;
+    uint32_t word;
+    memcpy(&word, bytes, sizeof(word));
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr, word);
+    num -= 4;
+    addr += 4;
+    bytes += 4;
+  }
+
+  if (num != 0)
+  {
+    uint32_t last_word = 0xFFFFFFFF;
+    memcpy(&last_word, bytes, num);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr, last_word);
   }
 
   HAL_FLASH_Lock();

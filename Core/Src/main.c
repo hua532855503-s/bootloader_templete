@@ -135,24 +135,24 @@ int main(void)
 
     if (Boot_Flag & UPDATEA_FLAG)      //判断是否需要更新A分区
     {
-      uint32_t len = OTA_Info.File_Size[Update_Info.W25Q64_Blook];
+      uint32_t len = OTA_Info.File_Size[Update_Info.W25Q64_Block];
       uint16_t surplus = len % FLASH_PAGE_SIZE;
 
       printf("长度 %lu 字节\r\n", len);
-      if (len % 4 == 0)
+      if (len != 0 && len <= FLASH_PAGEA_NUMBER * FLASH_PAGE_SIZE && len <= 64 * FLASH_PAGE_SIZE)
       {
         STM32_Erase_Flash(FLASH_PAGEB_NUMBER, FLASH_PAGEA_NUMBER);
-        for (uint8_t i = 0; i < len / FLASH_PAGE_SIZE; i++)
+        for (uint32_t i = 0; i < len / FLASH_PAGE_SIZE; i++)
         {
-          W25Q64_Read_Data(Update_Info.Update_buf, Update_Info.W25Q64_Blook * 64 * FLASH_PAGE_SIZE + i * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE);
+          W25Q64_Read_Data(Update_Info.Update_buf, Update_Info.W25Q64_Block * 64 * FLASH_PAGE_SIZE + i * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE);
           STM32_Write_Flash(FLASH_PAGEA_START_ADDR + i * FLASH_PAGE_SIZE, (uint32_t*)Update_Info.Update_buf, FLASH_PAGE_SIZE);
         }
         if (surplus != 0)
         {
-          W25Q64_Read_Data(Update_Info.Update_buf, Update_Info.W25Q64_Blook * 64 * FLASH_PAGE_SIZE + len / FLASH_PAGE_SIZE * FLASH_PAGE_SIZE, surplus);
+          W25Q64_Read_Data(Update_Info.Update_buf, Update_Info.W25Q64_Block * 64 * FLASH_PAGE_SIZE + len / FLASH_PAGE_SIZE * FLASH_PAGE_SIZE, surplus);
           STM32_Write_Flash(FLASH_PAGEA_START_ADDR + len / FLASH_PAGE_SIZE * FLASH_PAGE_SIZE,(uint32_t*)Update_Info.Update_buf, surplus);
         }
-        if (Update_Info.W25Q64_Blook == 0)
+        if (Update_Info.W25Q64_Block == 0)
         {
           OTA_Info.OTA_Flag = 0;
           AT24C02_Write_OTASetting();
@@ -166,11 +166,11 @@ int main(void)
       }
     }
 
-    if (Boot_Flag & XMODEMC_FLAG)
+    if (Boot_Flag & IAP_XMODEMC_FLAG)
     {
       if (Update_Info.Xmodem_Timer >= 100)
       {
-        printf("C\r\n");
+        Xmodem_Send_Cmd('C');
         Update_Info.Xmodem_Timer = 0;
       }
       Update_Info.Xmodem_Timer++;

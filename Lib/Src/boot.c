@@ -3,7 +3,10 @@
 #include "usart.h"
 #include "delay.h"
 #include "fmc.h"
+#include "at24c02.h"
+#include "w25q64.h"
 #include "string.h"
+#include <stdio.h>
 
 load_a load_A;
 extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
@@ -16,7 +19,7 @@ void Bootloader_Branch(void)
     {
       printf("OTA更新\r\n");
       Boot_Flag = UPDATEA_FLAG;
-      Update_Info.W25Q64_Blook = 0;
+      Update_Info.W25Q64_Block = 0;
     }
     else
     {
@@ -61,7 +64,7 @@ void LOAD_A(uint32_t addr)
     printf("跳转A分区\r\n");
     __disable_irq();
     Bootloader_Clear();
-    SCB->VTOR = app_stack;
+    SCB->VTOR = addr;
     __set_MSP(app_stack);
     load_A = (load_a)(*(uint32_t *)(addr + 4));
     load_A();
@@ -79,56 +82,75 @@ void Bootloader_Clear(void)
 
 void Bootloader_Event(uint8_t *data, uint16_t len)
 {
-  if (len == 1)
+  if (Boot_Flag == 0)
   {
-    switch (data[0])
+    if (len == 1)
     {
-      case '1':
-        printf("擦除A区\r\n");
-        STM32_Erase_Flash(FLASH_PAGEB_NUMBER, FLASH_PAGEA_NUMBER);
-        break;
-      case '2':
-        printf("通过Xmodem协议，串口IAP下载A区程序，请使用bin文件\r\n");
-        STM32_Erase_Flash(FLASH_PAGEB_NUMBER, FLASH_PAGEA_NUMBER);
-        Boot_Flag |= (XMODEMC_FLAG|XMODEMD_FLAG);
-        Update_Info.Xmodem_Timer = 0;
-        Update_Info.Xmodem_Num = 0;
-        Update_Info.Xmodem_CRC = 0;
-        break;
-      case '3':
-        printf("设置OTA版本号\r\n");
-        break;
-      case '4':
-        printf("查询OTA版本号\r\n");
-        break;
-      case '5':
-        printf("向外部Flash下载程序\r\n");
-        break;
-      case '6':
-        printf("使用外部Flash内程序\r\n");
-        break;
-      case '7':
-        printf("重启\r\n");
-        Delay_ms(100);
-        NVIC_SystemReset();
-        break;
+      switch (data[0])
+      {
+        case '1':
+          printf("擦除A区\r\n");
+          STM32_Erase_Flash(FLASH_PAGEB_NUMBER, FLASH_PAGEA_NUMBER);
+          break;
+        case '2':
+          printf("通过Xmodem协议，串口IAP下载A区程序，请使用bin文件\r\n");
+          STM32_Erase_Flash(FLASH_PAGEB_NUMBER, FLASH_PAGEA_NUMBER);
+          Boot_Flag |= (IAP_XMODEMC_FLAG|IAP_XMODEMD_FLAG);
+          Update_Info.Xmodem_Timer = 0;
+          Update_Info.Xmodem_Num = 0;
+          break;
+        case '3':
+          printf("设置OTA版本号，输入格式为VER-x.x.x-xx/xx/xx-xx:xx\r\n");
+          Boot_Flag |= SET_VER_FLAG;
+          break;
+        case '4':
+          AT24C02_Read_OTASetting();
+          printf("版本号: %s\r\n", OTA_Info.OTA_Ver);
+          Bootloader_Info();
+          break;
+        case '5':
+          printf("向外部Flash下载程序，输入需要使用的块文件(1~9)\r\n");
+          Boot_Flag |= OUTFLASH_DOWNLOAD_FLAG;
+          Update_Info.Xmodem_Timer = 0;
+          Update_Info.Xmodem_Num = 0;
+          break;
+        case '6':
+          printf("使用外部Flash内程序，输入需要使用的块文件(1~9)\r\n");
+          Boot_Flag |= FLASH_DOWNLOAD_FLAG;
+          break;
+        case '7':
+          printf("重启\r\n");
+          Delay_ms(100);
+          NVIC_SystemReset();
+          break;
+      }
     }
   }
-  if (Boot_Flag & XMODEMD_FLAG)
+  else if (Boot_Flag & IAP_XMODEMD_FLAG)
   {
     uint8_t packet_size = FLASH_PAGE_SIZE / 128;
     if (len == 133 && data[0] == 0x01)
     {
-      Boot_Flag &= ~XMODEMC_FLAG;
+      Boot_Flag &= ~IAP_XMODEMC_FLAG;
       Update_Info.Xmodem_CRC = Xmodem_CRC16(&data[3], 128);
       uint16_t crc = (uint16_t)data[131] << 8 | data[132];
       if (Update_Info.Xmodem_CRC == crc)
       {
         memcpy(&Update_Info.Update_buf[Update_Info.Xmodem_Num % packet_size * 128], &data[3], 128);
         Update_Info.Xmodem_Num++;
-        if (Update_Info.Xmodem_Num % packet_size == 0)
+        if (Update_Info.Xmodem_Num % packet_size == 0)            //每接收完一个包(1k)写入
         {
-          STM32_Write_Flash(FLASH_PAGEA_START_ADDR + (Update_Info.Xmodem_Num / packet_size - 1) * FLASH_PAGE_SIZE, (uint32_t*)Update_Info.Update_buf, FLASH_PAGE_SIZE);
+          if (Boot_Flag & OUTFLASH_XMODEM_FLAG)
+          {
+            for (uint8_t i = 0; i < 4; i++)
+            {
+              W25Q64_Write_Page(&Update_Info.Update_buf[i * 256], (Update_Info.Xmodem_Num / 8 - 1) * 4 + i + Update_Info.W25Q64_Block * 256, 256);
+            }
+          }
+          else
+          {
+            STM32_Write_Flash(FLASH_PAGEA_START_ADDR + (Update_Info.Xmodem_Num / packet_size - 1) * FLASH_PAGE_SIZE, (uint32_t*)Update_Info.Update_buf, FLASH_PAGE_SIZE);
+          }
         }
         Xmodem_Send_Cmd(XMODEM_ACK);
       }
@@ -141,11 +163,90 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
     {
       if (Update_Info.Xmodem_Num % packet_size != 0)
       {
-        STM32_Write_Flash(FLASH_PAGEA_START_ADDR + Update_Info.Xmodem_Num / packet_size * FLASH_PAGE_SIZE, (uint32_t*)Update_Info.Update_buf, Update_Info.Xmodem_Num % packet_size * 128);
+        if (Boot_Flag & OUTFLASH_XMODEM_FLAG)
+        {
+          uint16_t remaining = (uint16_t)(Update_Info.Xmodem_Num % packet_size) * 128;
+          uint16_t pages = (remaining + 255) / 256;
+          for (uint16_t i = 0; i < pages; i++)
+          {
+            uint16_t offset = i * 256;
+            uint16_t length = remaining - offset;
+            if (length > 256)
+            {
+              length = 256;
+            }
+            W25Q64_Write_Page(&Update_Info.Update_buf[offset], (Update_Info.Xmodem_Num / 8) * 4 + i + Update_Info.W25Q64_Block * 256, length);
+          }
+        }
+        else
+        {
+          STM32_Write_Flash(FLASH_PAGEA_START_ADDR + Update_Info.Xmodem_Num / packet_size * FLASH_PAGE_SIZE, (uint32_t*)Update_Info.Update_buf, Update_Info.Xmodem_Num % packet_size * 128);
+        }
       }
-      Boot_Flag &= ~XMODEMD_FLAG;
+      Boot_Flag &= ~IAP_XMODEMD_FLAG;
+      if (Boot_Flag & OUTFLASH_XMODEM_FLAG)
+      {
+        Boot_Flag &= ~OUTFLASH_XMODEM_FLAG;
+        OTA_Info.File_Size[Update_Info.W25Q64_Block] = Update_Info.Xmodem_Num * 128;
+        AT24C02_Write_OTASetting();
+      }
       Delay_ms(100);
       NVIC_SystemReset();
+    }
+  }
+  else if (Boot_Flag & SET_VER_FLAG)
+  {
+    if (len == 26)
+    {
+      int temp;
+      if (sscanf((char*)data, "VER-%d.%d.%d-%d/%d/%d-%d:%d", &temp, &temp, &temp, &temp, &temp, &temp, &temp, &temp) == 8)
+      {
+        memset(OTA_Info.OTA_Ver, 0, sizeof(OTA_Info.OTA_Ver));
+        memcpy(OTA_Info.OTA_Ver, data, len);
+        AT24C02_Write_OTASetting();
+        printf("设置成功\r\n");
+        Boot_Flag &= ~SET_VER_FLAG;
+        Bootloader_Info();
+      }
+      else
+      {
+        printf("版本号格式错误\r\n");
+      }
+    }
+    else
+    {
+      printf("版本号长度错误\r\n");
+    }
+  }
+  else if (Boot_Flag & OUTFLASH_DOWNLOAD_FLAG)
+  {
+    if (len == 1 && data[0] >= '1' && data[0] <= '9')
+    {
+      Update_Info.W25Q64_Block = data[0] - '0';
+      Boot_Flag |= (IAP_XMODEMC_FLAG|IAP_XMODEMD_FLAG|OUTFLASH_XMODEM_FLAG);
+      Update_Info.Xmodem_Timer = 0;
+      Update_Info.Xmodem_Num = 0;
+      OTA_Info.File_Size[Update_Info.W25Q64_Block] = 0;
+      W25Q64_Erase_64K(Update_Info.W25Q64_Block);
+      printf("通过Xmodem协议，向外部Flash第 %lu 块写入程序，请使用bin文件\r\n", Update_Info.W25Q64_Block);
+      Boot_Flag &= ~OUTFLASH_DOWNLOAD_FLAG;
+    }
+    else
+    {
+      printf("输入错误，请输入1~9\r\n");
+    }
+  }
+  else if (Boot_Flag & FLASH_DOWNLOAD_FLAG)
+  {
+    if (len == 1 && data[0] >= '1' && data[0] <= '9')
+    {
+      Update_Info.W25Q64_Block = data[0] - '0';
+      Boot_Flag |= UPDATEA_FLAG;
+      Boot_Flag &= ~FLASH_DOWNLOAD_FLAG;
+    }
+    else
+    {
+      printf("输入错误，请输入1~9\r\n");
     }
   }
 }
