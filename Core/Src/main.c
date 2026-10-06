@@ -25,14 +25,15 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stdio.h"
-#include "string.h"
 #include "delay.h"
 #include "iic.h"
 #include "at24c02.h"
 #include "w25q64.h"
 #include "fmc.h"
 #include "boot.h"
+
+#include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 /* USER CODE END Includes */
 

@@ -1,4 +1,5 @@
 #include "fmc.h"
+#include <stdio.h>
 #include <string.h>
 
 void STM32_Erase_Flash(uint16_t start, uint16_t num)

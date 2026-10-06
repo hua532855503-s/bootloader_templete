@@ -5,7 +5,8 @@
 #include "fmc.h"
 #include "at24c02.h"
 #include "w25q64.h"
-#include "string.h"
+
+#include <string.h>
 #include <stdio.h>
 
 load_a load_A;
@@ -169,13 +170,12 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
           uint16_t pages = (remaining + 255) / 256;
           for (uint16_t i = 0; i < pages; i++)
           {
-            uint16_t offset = i * 256;
-            uint16_t length = remaining - offset;
+            uint16_t length = remaining - i * 256;
             if (length > 256)
             {
               length = 256;
             }
-            W25Q64_Write_Page(&Update_Info.Update_buf[offset], (Update_Info.Xmodem_Num / 8) * 4 + i + Update_Info.W25Q64_Block * 256, length);
+            W25Q64_Write_Page(&Update_Info.Update_buf[i * 256], (Update_Info.Xmodem_Num / 8) * 4 + i + Update_Info.W25Q64_Block * 256, length);
           }
         }
         else

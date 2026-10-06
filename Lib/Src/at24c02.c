@@ -2,6 +2,7 @@
 #include "iic.h"
 #include "main.h"
 #include "delay.h"
+
 #include <string.h>
 
 uint8_t AT24C02_Write_Byte(uint8_t addr, uint8_t data)
