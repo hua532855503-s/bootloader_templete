@@ -11,6 +11,7 @@ void W25Q64_Wait_Busy(void);
 void W25Q64_Write_Enable(void);
 void W25Q64_Erase_64K(uint8_t block);
 void W25Q64_Write_Page(uint8_t* data, uint16_t page, uint16_t length);
+void W25Q64_Write(uint8_t* data, uint32_t address, uint32_t length);
 void W25Q64_Read_Data(uint8_t* buffer, uint32_t address, uint16_t length);
 
 #endif

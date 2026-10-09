@@ -12,6 +12,45 @@
 load_a load_A;
 extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
 
+static void Xmodem_Write(uint32_t offset, uint32_t length)
+{
+  if (Boot_Flag & OUTFLASH_XMODEM_FLAG)
+  {
+    uint32_t address = Update_Info.W25Q64_Block * 64U * 1024U + offset;
+    W25Q64_Write(Update_Info.Update_buf, address, length);
+  }
+  else
+  {
+    STM32_Write_Flash(FLASH_PAGEA_START_ADDR + offset, (uint32_t *)Update_Info.Update_buf, length);
+  }
+}
+
+static uint16_t Xmodem_CRC16(uint8_t *buf, uint16_t len)
+{
+  uint16_t crc = 0;
+  while (len--)
+  {
+    crc ^= (uint16_t)(*buf++) << 8;
+    for (uint8_t i = 0; i < 8; i++)
+    {
+      if (crc & 0x8000)
+      {
+        crc = (uint16_t)((crc << 1) ^ 0x1021);
+      }
+      else
+      {
+        crc <<= 1;
+      }
+    }
+  }
+  return crc;
+}
+
+void Xmodem_Send_Cmd(uint8_t cmd)
+{
+  HAL_UART_Transmit(&huart2, &cmd, 1, 1000);
+}
+
 void Bootloader_Branch(void)
 {
   if (Bootloader_Enter(20) == 0)
@@ -133,65 +172,51 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
   }
   else if (Boot_Flag & IAP_XMODEMD_FLAG)
   {
-    uint8_t packet_size = FLASH_PAGE_SIZE / 128;
-    if (len == 133 && data[0] == 0x01)
+    const uint32_t packet_size = FLASH_PAGE_SIZE / XMODEM_DATA_SIZE;
+
+    if (len == XMODEM_FRAME_SIZE && data[0] == 0x01)
     {
-      Boot_Flag &= ~IAP_XMODEMC_FLAG;
-      Update_Info.Xmodem_CRC = Xmodem_CRC16(&data[3], 128);
-      uint16_t crc = (uint16_t)data[131] << 8 | data[132];
-      if (Update_Info.Xmodem_CRC == crc)
-      {
-        memcpy(&Update_Info.Update_buf[Update_Info.Xmodem_Num % packet_size * 128], &data[3], 128);
-        Update_Info.Xmodem_Num++;
-        if (Update_Info.Xmodem_Num % packet_size == 0)            //每接收完一个包(1k)写入
-        {
-          if (Boot_Flag & OUTFLASH_XMODEM_FLAG)
-          {
-            for (uint8_t i = 0; i < 4; i++)
-            {
-              W25Q64_Write_Page(&Update_Info.Update_buf[i * 256], (Update_Info.Xmodem_Num / 8 - 1) * 4 + i + Update_Info.W25Q64_Block * 256, 256);
-            }
-          }
-          else
-          {
-            STM32_Write_Flash(FLASH_PAGEA_START_ADDR + (Update_Info.Xmodem_Num / packet_size - 1) * FLASH_PAGE_SIZE, (uint32_t*)Update_Info.Update_buf, FLASH_PAGE_SIZE);
-          }
-        }
-        Xmodem_Send_Cmd(XMODEM_ACK);
-      }
-      else
+      uint8_t expected_packet = (uint8_t)((Update_Info.Xmodem_Num + 1U) & 0xFFU);
+      uint16_t received_crc = (uint16_t)data[131] << 8 | data[132];
+      uint16_t calculated_crc = Xmodem_CRC16(&data[3], XMODEM_DATA_SIZE);
+
+      if (data[1] != expected_packet || data[2] != (uint8_t)~data[1])
       {
         Xmodem_Send_Cmd(XMODEM_NAK);
       }
-    }
-    if (len == 1 && data[0] == 0x04)
-    {
-      if (Update_Info.Xmodem_Num % packet_size != 0)
+      else if (calculated_crc != received_crc)
       {
-        if (Boot_Flag & OUTFLASH_XMODEM_FLAG)
+        Xmodem_Send_Cmd(XMODEM_NAK);
+      }
+      else
+      {
+        const uint32_t packet_index = Update_Info.Xmodem_Num % packet_size;
+
+        Boot_Flag &= ~IAP_XMODEMC_FLAG;
+        Update_Info.Xmodem_CRC = calculated_crc;
+        memcpy(&Update_Info.Update_buf[packet_index * XMODEM_DATA_SIZE], &data[3], XMODEM_DATA_SIZE);
+        Update_Info.Xmodem_Num++;
+
+        if (Update_Info.Xmodem_Num % packet_size == 0U)
         {
-          uint16_t remaining = (uint16_t)(Update_Info.Xmodem_Num % packet_size) * 128;
-          uint16_t pages = (remaining + 255) / 256;
-          for (uint16_t i = 0; i < pages; i++)
-          {
-            uint16_t length = remaining - i * 256;
-            if (length > 256)
-            {
-              length = 256;
-            }
-            W25Q64_Write_Page(&Update_Info.Update_buf[i * 256], (Update_Info.Xmodem_Num / 8) * 4 + i + Update_Info.W25Q64_Block * 256, length);
-          }
+          Xmodem_Write((Update_Info.Xmodem_Num / packet_size - 1U) * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE);
         }
-        else
-        {
-          STM32_Write_Flash(FLASH_PAGEA_START_ADDR + Update_Info.Xmodem_Num / packet_size * FLASH_PAGE_SIZE, (uint32_t*)Update_Info.Update_buf, Update_Info.Xmodem_Num % packet_size * 128);
-        }
+        Xmodem_Send_Cmd(XMODEM_ACK);
+      }
+    }
+    else if (len == 1 && data[0] == 0x04)
+    {
+      const uint32_t packets_in_page = Update_Info.Xmodem_Num % packet_size;
+
+      if (packets_in_page != 0U)
+      {
+        Xmodem_Write((Update_Info.Xmodem_Num / packet_size) * FLASH_PAGE_SIZE, packets_in_page * XMODEM_DATA_SIZE);
       }
       Boot_Flag &= ~IAP_XMODEMD_FLAG;
       if (Boot_Flag & OUTFLASH_XMODEM_FLAG)
       {
         Boot_Flag &= ~OUTFLASH_XMODEM_FLAG;
-        OTA_Info.File_Size[Update_Info.W25Q64_Block] = Update_Info.Xmodem_Num * 128;
+        OTA_Info.File_Size[Update_Info.W25Q64_Block] = Update_Info.Xmodem_Num * XMODEM_DATA_SIZE;
         AT24C02_Write_OTASetting();
       }
       Delay_ms(100);
@@ -299,30 +324,4 @@ void Bootloader_Process_Byte(uint8_t byte)
   {
     Bootloader_Event(&byte, 1);
   }
-}
-
-uint16_t Xmodem_CRC16(uint8_t *buf, uint16_t len)
-{
-  uint16_t crc = 0;
-  while (len--)
-  {
-    crc ^= (uint16_t)(*buf++) << 8;
-    for (uint8_t i = 0; i < 8; i++)
-    {
-      if (crc & 0x8000)
-      {
-        crc = (uint16_t)((crc << 1) ^ 0x1021);
-      }
-      else
-      {
-        crc <<= 1;
-      }
-    }
-  }
-  return crc;
-}
-
-void Xmodem_Send_Cmd(uint8_t cmd)
-{
-  HAL_UART_Transmit(&huart2, &cmd, 1, 1000);
 }

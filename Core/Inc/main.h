@@ -85,6 +85,8 @@ void Error_Handler(void);
 
 #define XMODEM_ACK                    0x06
 #define XMODEM_NAK                    0x15
+#define XMODEM_DATA_SIZE              128U
+#define XMODEM_FRAME_SIZE             133U
 
 #define UPDATEA_FLAG                  0x00000001
 #define IAP_XMODEMC_FLAG              0x00000002
