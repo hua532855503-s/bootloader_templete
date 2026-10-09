@@ -46,7 +46,6 @@
 /* USER CODE BEGIN PD */
 extern DMA_HandleTypeDef hdma_usart2_rx;
 extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
-extern UART_data UART2_RX_data;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -115,7 +114,7 @@ int main(void)
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, UART2_RX_BUF, UART_RX_SIZE);
   __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
 
-  Bootloader_Branch();
+  Bootloader_Branch();                    //重置代码提交 git reset --soft HEAD~1
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -124,14 +123,10 @@ int main(void)
   {
     Delay_ms(10);
 
-    if (UART2_RX_data.out != UART2_RX_data.in)      //判断是否有数据接收
+    uint8_t rx_byte;
+    while (UART2_RX_Read(&rx_byte, 1) == 1)
     {
-      Bootloader_Event(UART2_RX_data.out->start, UART2_RX_data.out->end - UART2_RX_data.out->start + 1);
-      UART2_RX_data.out++;
-      if (UART2_RX_data.out == UART2_RX_data.end)
-      {
-        UART2_RX_data.out = UART2_RX_data.data;
-      }
+      Bootloader_Process_Byte(rx_byte);
     }
 
     if (Boot_Flag & UPDATEA_FLAG)      //判断是否需要更新A分区

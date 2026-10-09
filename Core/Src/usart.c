@@ -19,10 +19,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "usart.h"
+#include <string.h>
 
 /* USER CODE BEGIN 0 */
 uint8_t UART2_RX_BUF[UART_RX_SIZE];
-UART_data UART2_RX_data;
+
+static volatile uint16_t uart_rx_read_pos;
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart2;
@@ -94,7 +96,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     hdma_usart2_rx.Init.MemInc = DMA_MINC_ENABLE;
     hdma_usart2_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_usart2_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_usart2_rx.Init.Mode = DMA_NORMAL;
+    hdma_usart2_rx.Init.Mode = DMA_CIRCULAR;
     hdma_usart2_rx.Init.Priority = DMA_PRIORITY_LOW;
     if (HAL_DMA_Init(&hdma_usart2_rx) != HAL_OK)
     {
@@ -161,38 +163,29 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 
 void UART2_RX_PtrInit(void)
 {
-  UART2_RX_data.count = 0;
-  UART2_RX_data.in = &UART2_RX_data.data[0];
-  UART2_RX_data.out = &UART2_RX_data.data[0];
-  UART2_RX_data.end = &UART2_RX_data.data[PTR_LEN];
-  UART2_RX_data.in->start = &UART2_RX_BUF[0];
+  uart_rx_read_pos = 0;
+  memset(UART2_RX_BUF, 0, UART_RX_SIZE);
 }
 
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+uint16_t UART2_RX_Read(uint8_t *data, uint16_t max_len)
 {
-  if (huart->Instance == USART2)
+  uint16_t write_pos;
+  uint16_t count = 0;
+
+  write_pos = UART_RX_SIZE - __HAL_DMA_GET_COUNTER(&hdma_usart2_rx);
+
+  while (uart_rx_read_pos != write_pos && count < max_len)
   {
-    UART2_RX_data.count += Size;
-    UART2_RX_data.in->end = &UART2_RX_BUF[UART2_RX_data.count - 1];
-    UART2_RX_data.in++;
+    data[count++] = UART2_RX_BUF[uart_rx_read_pos];
 
-    if (UART2_RX_data.in >= UART2_RX_data.end)
+    uart_rx_read_pos++;
+    if (uart_rx_read_pos >= UART_RX_SIZE)
     {
-      UART2_RX_data.in = &UART2_RX_data.data[0];
+      uart_rx_read_pos = 0;
     }
-
-    if (UART_RX_SIZE - UART2_RX_data.count >= UART_RX_MAX)
-    {
-      UART2_RX_data.in->start = &UART2_RX_BUF[UART2_RX_data.count];
-    }
-    else
-    {
-      UART2_RX_data.in->start = UART2_RX_BUF;
-      UART2_RX_data.count = 0;
-    }
-    HAL_UARTEx_ReceiveToIdle_DMA(&huart2,UART2_RX_data.in->start,UART_RX_SIZE - UART2_RX_data.count);
-    __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
   }
+
+  return count;
 }
 
 int _write(int file, char *ptr, int len)
@@ -205,4 +198,3 @@ int _write(int file, char *ptr, int len)
 }
 
 /* USER CODE END 1 */
-

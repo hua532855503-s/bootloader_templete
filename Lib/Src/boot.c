@@ -34,12 +34,16 @@ void Bootloader_Branch(void)
 uint8_t Bootloader_Enter(uint8_t timeout)
 {
   printf("%dms内输入w，进入bootloader命令行\r\n", timeout * 100);
+  uint8_t data;
   while (timeout--)
   {
     Delay_ms(100);
-    if (UART2_RX_BUF[0] == 'w')           //进入bootloader命令行
+    if (UART2_RX_Read(&data, 1) == 1)
     {
-      return 1;
+      if (data == 'w')
+      {
+        return 1;
+      }
     }
   }
   return 0;
@@ -196,7 +200,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
   }
   else if (Boot_Flag & SET_VER_FLAG)
   {
-    if (len == 26)
+    if (len == OTA_VERSION_INPUT_LEN)
     {
       int temp;
       if (sscanf((char*)data, "VER-%d.%d.%d-%d/%d/%d-%d:%d", &temp, &temp, &temp, &temp, &temp, &temp, &temp, &temp) == 8)
@@ -248,6 +252,52 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
     {
       printf("输入错误，请输入1~9\r\n");
     }
+  }
+}
+
+void Bootloader_Process_Byte(uint8_t byte)
+{
+  static uint8_t uart_frame[133];
+  static uint16_t uart_frame_len;
+  if (Boot_Flag & IAP_XMODEMD_FLAG)
+  {
+    if (uart_frame_len == 0)
+    {
+      if (byte == 0x04)
+      {
+        Bootloader_Event(&byte, 1);
+      }
+      else if (byte == 0x01)
+      {
+        uart_frame[uart_frame_len++] = byte;
+      }
+      return;
+    }
+
+    uart_frame[uart_frame_len++] = byte;
+    if (uart_frame_len == sizeof(uart_frame))
+    {
+      Bootloader_Event(uart_frame, sizeof(uart_frame));
+      uart_frame_len = 0;
+    }
+    return;
+  }
+
+  if (Boot_Flag & SET_VER_FLAG)
+  {
+    uart_frame[uart_frame_len++] = byte;
+    if (uart_frame_len == OTA_VERSION_INPUT_LEN)
+    {
+      uart_frame[uart_frame_len] = '\0';
+      Bootloader_Event(uart_frame, uart_frame_len);
+      uart_frame_len = 0;
+    }
+    return;
+  }
+
+  if (byte != '\r' && byte != '\n')
+  {
+    Bootloader_Event(&byte, 1);
   }
 }
 

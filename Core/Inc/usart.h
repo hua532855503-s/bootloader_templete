@@ -29,34 +29,22 @@ extern "C" {
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
-
+#include <string.h>
 /* USER CODE END Includes */
 
 extern UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN Private defines */
 #define UART_RX_SIZE  2048
-#define UART_RX_MAX   256
-#define PTR_LEN       10
 
-typedef struct {
-  uint8_t *start;
-  uint8_t *end;
-} UART_SEptr;
-
-typedef struct {
-  volatile uint16_t count;
-  UART_SEptr data[PTR_LEN];
-  UART_SEptr *volatile in;
-  UART_SEptr *volatile out;
-  UART_SEptr *volatile end;
-} UART_data;
+extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
 /* USER CODE END Private defines */
 
 void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 void UART2_RX_PtrInit(void);
+uint16_t UART2_RX_Read(uint8_t *data, uint16_t max_len);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

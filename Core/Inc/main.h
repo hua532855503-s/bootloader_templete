@@ -81,6 +81,7 @@ void Error_Handler(void);
 
 #define OTA_SET_FLAG                  0xAABB1122
 #define OTA_SETTING_SIZE              sizeof(OTA_Setting)
+#define OTA_VERSION_INPUT_LEN         26
 
 #define XMODEM_ACK                    0x06
 #define XMODEM_NAK                    0x15
