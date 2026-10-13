@@ -16,7 +16,7 @@ static void Xmodem_Write(uint32_t offset, uint32_t length)
 {
   if (Boot_Flag & OUTFLASH_XMODEM_FLAG)
   {
-    uint32_t address = Update_Info.W25Q64_Block * 64U * 1024U + offset;
+    uint32_t address = Update_Info.W25Q64_Block * 64 * 1024 + offset;
     W25Q64_Write(Update_Info.Update_buf, address, length);
   }
   else
@@ -176,7 +176,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
 
     if (len == XMODEM_FRAME_SIZE && data[0] == 0x01)
     {
-      uint8_t expected_packet = (uint8_t)((Update_Info.Xmodem_Num + 1U) & 0xFFU);
+      uint8_t expected_packet = (uint8_t)((Update_Info.Xmodem_Num + 1) & 0xFF);
       uint16_t received_crc = (uint16_t)data[131] << 8 | data[132];
       uint16_t calculated_crc = Xmodem_CRC16(&data[3], XMODEM_DATA_SIZE);
 
@@ -197,9 +197,9 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
         memcpy(&Update_Info.Update_buf[packet_index * XMODEM_DATA_SIZE], &data[3], XMODEM_DATA_SIZE);
         Update_Info.Xmodem_Num++;
 
-        if (Update_Info.Xmodem_Num % packet_size == 0U)
+        if (Update_Info.Xmodem_Num % packet_size == 0)
         {
-          Xmodem_Write((Update_Info.Xmodem_Num / packet_size - 1U) * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE);
+          Xmodem_Write((Update_Info.Xmodem_Num / packet_size - 1) * FLASH_PAGE_SIZE, FLASH_PAGE_SIZE);
         }
         Xmodem_Send_Cmd(XMODEM_ACK);
       }
@@ -208,7 +208,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
     {
       const uint32_t packets_in_page = Update_Info.Xmodem_Num % packet_size;
 
-      if (packets_in_page != 0U)
+      if (packets_in_page != 0)
       {
         Xmodem_Write((Update_Info.Xmodem_Num / packet_size) * FLASH_PAGE_SIZE, packets_in_page * XMODEM_DATA_SIZE);
       }

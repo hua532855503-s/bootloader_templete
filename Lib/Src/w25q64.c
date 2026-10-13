@@ -64,7 +64,7 @@ void W25Q64_Write(uint8_t* data, uint32_t address, uint32_t length)
 {
   while (length > 0)
   {
-    uint32_t page_offset = address & 0xFFU;
+    uint32_t page_offset = address & 0xFF;
     uint32_t write_length = 256U - page_offset;
 
     if (write_length > length)
