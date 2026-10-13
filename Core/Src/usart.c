@@ -192,14 +192,38 @@ uint16_t UART2_RX_Read(uint8_t *data, uint16_t max_len)
   return count;
 }
 
-int _write(int file, char *ptr, int len)
+/* 通过 USART2 阻塞发送以 '\0' 结尾的字符串。 */
+void UART2_SendString(const char *str)
 {
-  /* 将 printf 重定向到 USART2。 */
-  if(HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, 1000) != HAL_OK)
+  uint16_t len = 0;
+
+  while (str[len] != '\0')
+  {
+    len++;
+  }
+
+  if (HAL_UART_Transmit(&huart2, (uint8_t *)str, len, 1000) != HAL_OK)
   {
     Error_Handler();
   }
-  return len;
+}
+
+/* 将无符号 32 位整数转换为十进制文本并通过 USART2 发送。 */
+void UART2_SendU32(uint32_t value)
+{
+  char buffer[10];
+  uint8_t index = sizeof(buffer);
+
+  do
+  {
+    buffer[--index] = (char)('0' + value % 10U);
+    value /= 10U;
+  } while (value != 0U);
+
+  if (HAL_UART_Transmit(&huart2, (uint8_t *)&buffer[index], sizeof(buffer) - index, 1000) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /* USER CODE END 1 */

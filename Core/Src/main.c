@@ -32,7 +32,6 @@
 #include "fmc.h"
 #include "boot.h"
 
-#include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 /* USER CODE END Includes */
@@ -139,7 +138,9 @@ int main(void)
       uint32_t len = OTA_Info.File_Size[Update_Info.W25Q64_Block];
       uint16_t surplus = len % FLASH_PAGE_SIZE;
 
-      printf("长度 %lu 字节\r\n", len);
+      UART2_SendString("长度 ");
+      UART2_SendU32(len);
+      UART2_SendString(" 字节\r\n");
       if (len != 0 && len <= FLASH_PAGEA_NUMBER * FLASH_PAGE_SIZE && len <= 64 * FLASH_PAGE_SIZE)
       {
         /* 复制前擦除整个 A 区，之后按页读取和写入。 */
@@ -164,7 +165,7 @@ int main(void)
       }
       else
       {
-        printf("长度错误\r\n");
+        UART2_SendString("长度错误\r\n");
         Boot_Flag &= ~UPDATEA_FLAG;
       }
     }

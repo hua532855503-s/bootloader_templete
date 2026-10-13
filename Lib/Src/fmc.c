@@ -1,5 +1,5 @@
 #include "fmc.h"
-#include <stdio.h>
+#include "usart.h"
 #include <string.h>
 
 void STM32_Erase_Flash(uint16_t start, uint16_t num)
@@ -18,7 +18,9 @@ void STM32_Erase_Flash(uint16_t start, uint16_t num)
   uint32_t pageError = 0;
   if (HAL_FLASHEx_Erase(&eraseInitStruct, &pageError) != HAL_OK)
   {
-    printf("Flash Erase Error: %lu\r\n", pageError);
+    UART2_SendString("Flash Erase Error: ");
+    UART2_SendU32(pageError);
+    UART2_SendString("\r\n");
   }
 
   HAL_FLASH_Lock();

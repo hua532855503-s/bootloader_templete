@@ -45,6 +45,8 @@ void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN Prototypes */
 void UART2_RX_PtrInit(void);
 uint16_t UART2_RX_Read(uint8_t *data, uint16_t max_len);
+void UART2_SendString(const char *str);
+void UART2_SendU32(uint32_t value);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus
@@ -52,4 +54,3 @@ uint16_t UART2_RX_Read(uint8_t *data, uint16_t max_len);
 #endif
 
 #endif /* __USART_H__ */
-
