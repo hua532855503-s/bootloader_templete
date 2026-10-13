@@ -44,6 +44,7 @@ void MX_GPIO_Init(void)
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
+  /* PA4 为 W25Q64 片选，PB6/PB7 为软件 I2C 的 SDA/SCL。 */
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();

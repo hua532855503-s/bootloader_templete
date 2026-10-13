@@ -24,6 +24,7 @@
 /* USER CODE BEGIN 0 */
 uint8_t UART2_RX_BUF[UART_RX_SIZE];
 
+/* DMA 当前写入位置对应的环形缓冲区读指针。 */
 static volatile uint16_t uart_rx_read_pos;
 /* USER CODE END 0 */
 
@@ -163,6 +164,7 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 
 void UART2_RX_PtrInit(void)
 {
+  /* 清空接收缓冲区并将读指针归零。 */
   uart_rx_read_pos = 0;
   memset(UART2_RX_BUF, 0, UART_RX_SIZE);
 }
@@ -172,8 +174,10 @@ uint16_t UART2_RX_Read(uint8_t *data, uint16_t max_len)
   uint16_t write_pos;
   uint16_t count = 0;
 
+  /* DMA 计数器递减，因此用缓冲区总长度减去剩余数得到写指针。 */
   write_pos = UART_RX_SIZE - __HAL_DMA_GET_COUNTER(&hdma_usart2_rx);
 
+  /* 读取 DMA 已写入但应用尚未处理的数据，支持环形回绕。 */
   while (uart_rx_read_pos != write_pos && count < max_len)
   {
     data[count++] = UART2_RX_BUF[uart_rx_read_pos];
@@ -190,6 +194,7 @@ uint16_t UART2_RX_Read(uint8_t *data, uint16_t max_len)
 
 int _write(int file, char *ptr, int len)
 {
+  /* 将 printf 重定向到 USART2。 */
   if(HAL_UART_Transmit(&huart2, (uint8_t *)ptr, len, 1000) != HAL_OK)
   {
     Error_Handler();

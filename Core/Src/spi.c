@@ -23,8 +23,8 @@
 /* USER CODE BEGIN 0 */
 
 #define SPI_BUF_SIZE  32
-uint8_t spi_tx_buf[SPI_BUF_SIZE];
-uint8_t spi_rx_buf[SPI_BUF_SIZE];
+uint8_t spi_tx_buf[SPI_BUF_SIZE];  /* SPI 发送临时缓冲区。 */
+uint8_t spi_rx_buf[SPI_BUF_SIZE];  /* SPI 接收临时缓冲区。 */
 /* USER CODE END 0 */
 
 SPI_HandleTypeDef hspi1;
@@ -41,6 +41,7 @@ void MX_SPI1_Init(void)
 
   /* USER CODE END SPI1_Init 1 */
   hspi1.Instance = SPI1;
+  /* SPI1 作为 W25Q64 的主机接口，使用模式 0、MSB 先传输。 */
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
@@ -128,4 +129,3 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* spiHandle)
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
-

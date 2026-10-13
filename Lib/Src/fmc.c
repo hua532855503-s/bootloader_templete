@@ -4,8 +4,10 @@
 
 void STM32_Erase_Flash(uint16_t start, uint16_t num)
 {
-  if (start + num > 64) return;// 1. 地址范围校验（C8T6 共 64 页，0~63）
+  /* start 和 num 使用 Flash 页编号，先限制操作范围避免越界擦除。（C8T6共64页） */
+  if (start + num > 64) return;
 
+  /* 擦除期间必须解锁 Flash，完成后重新加锁。 */
   HAL_FLASH_Unlock();
 
   FLASH_EraseInitTypeDef eraseInitStruct;
@@ -24,6 +26,7 @@ void STM32_Erase_Flash(uint16_t start, uint16_t num)
 
 void STM32_Write_Flash(uint32_t addr, uint32_t *data, uint32_t num)
 {
+  /* 按 32 位写入内部 Flash；末尾不足 4 字节时用 0xFF 填充。 */
   HAL_FLASH_Unlock();
 
   uint8_t *bytes = (uint8_t *)data;

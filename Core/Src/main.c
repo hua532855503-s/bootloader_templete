@@ -58,7 +58,7 @@ extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
 /* USER CODE BEGIN PV */
 OTA_Setting OTA_Info;
 Update_Setting Update_Info;
-uint32_t Boot_Flag;
+uint32_t Boot_Flag;  /* Bootloader 当前工作状态标志。 */
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,12 +109,15 @@ int main(void)
   UART2_RX_PtrInit();
   IIC_Init();
   W25Q64_Init();
+  /* 从 AT24C02 读取 OTA 标志、版本号和各文件大小。 */
   AT24C02_Read_OTASetting();
   
+  /* 使用 DMA 循环接收串口数据，关闭半传输中断避免无用中断。 */
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, UART2_RX_BUF, UART_RX_SIZE);
   __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
 
-  Bootloader_Branch();                    //重置代码提交 git reset --soft HEAD~1
+  /* 检测升级请求；无请求时尝试跳转到 A 区应用。 */
+  Bootloader_Branch();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -123,20 +126,23 @@ int main(void)
   {
     Delay_ms(10);
 
+    /* 从 DMA 环形缓冲区取出数据，交给 Bootloader 状态机处理。 */
     uint8_t rx_byte;
     while (UART2_RX_Read(&rx_byte, 1) == 1)
     {
       Bootloader_Process_Byte(rx_byte);
     }
 
-    if (Boot_Flag & UPDATEA_FLAG)      //判断是否需要更新A分区
+    if (Boot_Flag & UPDATEA_FLAG)
     {
+      /* OTA 模式下，将外部 Flash 中选定的文件复制到内部 Flash A 区。 */
       uint32_t len = OTA_Info.File_Size[Update_Info.W25Q64_Block];
       uint16_t surplus = len % FLASH_PAGE_SIZE;
 
       printf("长度 %lu 字节\r\n", len);
       if (len != 0 && len <= FLASH_PAGEA_NUMBER * FLASH_PAGE_SIZE && len <= 64 * FLASH_PAGE_SIZE)
       {
+        /* 复制前擦除整个 A 区，之后按页读取和写入。 */
         STM32_Erase_Flash(FLASH_PAGEB_NUMBER, FLASH_PAGEA_NUMBER);
         for (uint32_t i = 0; i < len / FLASH_PAGE_SIZE; i++)
         {
@@ -150,6 +156,7 @@ int main(void)
         }
         if (Update_Info.W25Q64_Block == 0)
         {
+          /* 块 0 表示当前 OTA 文件，成功搬运后清除 OTA 请求标志。 */
           OTA_Info.OTA_Flag = 0;
           AT24C02_Write_OTASetting();
         }
@@ -164,6 +171,7 @@ int main(void)
 
     if (Boot_Flag & IAP_XMODEMC_FLAG)
     {
+      /* Xmodem 发送端未开始时，周期性发送字符 C 请求 CRC 模式。 */
       if (Update_Info.Xmodem_Timer >= 100)
       {
         Xmodem_Send_Cmd('C');
