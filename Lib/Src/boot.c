@@ -51,10 +51,10 @@ static uint16_t Xmodem_CRC16(uint8_t *buf, uint16_t len)
 /* 校验固定格式：VER-x.x.x-xx/xx/xx-xx:xx\r\n。 */
 static uint8_t Boot_IsValidVersion(const uint8_t *data, uint16_t len)
 {
-  static const char pattern[] = "VER-0.0.0-00/00/00-00:00";
+  static const char pattern[] = "VER-0.0.0-0000/00/00-00:00";
   uint8_t i;
 
-  if (len != OTA_VERSION_INPUT_LEN || data[24] != '\r' || data[25] != '\n')
+  if (len != OTA_VERSION_INPUT_LEN)
   {
     return 0;
   }
@@ -187,7 +187,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
           break;
         case '3':
           /* 后续固定长度字符串将作为 OTA 版本号处理。 */
-          UART2_SendString("设置OTA版本号，输入格式为VER-x.x.x-xx/xx/xx-xx:xx\r\n");
+          UART2_SendString("设置OTA版本号，输入格式为VER-x.x.x-xxxx/xx/xx-xx:xx\r\n");
           Boot_Flag |= SET_VER_FLAG;
           break;
         case '4':
@@ -283,7 +283,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
       if (Boot_IsValidVersion(data, len))
       {
         memset(OTA_Info.OTA_Ver, 0, sizeof(OTA_Info.OTA_Ver));
-        memcpy(OTA_Info.OTA_Ver, data, 24);
+        memcpy(OTA_Info.OTA_Ver, data, 26);
         AT24C02_Write_OTASetting();
         UART2_SendString("设置成功\r\n");
         Boot_Flag &= ~SET_VER_FLAG;
@@ -293,10 +293,6 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
       {
         UART2_SendString("版本号格式错误\r\n");
       }
-    }
-    else
-    {
-      UART2_SendString("版本号长度错误\r\n");
     }
   }
   else if (Boot_Flag & OUTFLASH_DOWNLOAD_FLAG)
