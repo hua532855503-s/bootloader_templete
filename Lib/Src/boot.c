@@ -50,6 +50,35 @@ static uint16_t Xmodem_CRC16(uint8_t *buf, uint16_t len)
   return crc;
 }
 
+/* 校验固定格式：VER-x.x.x-xx/xx/xx-xx:xx\r\n。 */
+static uint8_t Boot_IsValidVersion(const uint8_t *data, uint16_t len)
+{
+  static const char pattern[] = "VER-0.0.0-00/00/00-00:00";
+  uint8_t i;
+
+  if (len != OTA_VERSION_INPUT_LEN || data[24] != '\r' || data[25] != '\n')
+  {
+    return 0;
+  }
+
+  for (i = 0; i < 24; i++)
+  {
+    if (pattern[i] == '0')
+    {
+      if (data[i] < '0' || data[i] > '9')
+      {
+        return 0;
+      }
+    }
+    else if (data[i] != (uint8_t)pattern[i])
+    {
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
 void Xmodem_Send_Cmd(uint8_t cmd)
 {
   /* 向上位机发送 ACK、NAK 等 Xmodem 控制字符。 */
@@ -250,11 +279,10 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
     /* 校验并保存固定格式的 OTA 版本字符串。 */
     if (len == OTA_VERSION_INPUT_LEN)
     {
-      int temp;
-      if (sscanf((char*)data, "VER-%d.%d.%d-%d/%d/%d-%d:%d", &temp, &temp, &temp, &temp, &temp, &temp, &temp, &temp) == 8)
+      if (Boot_IsValidVersion(data, len))
       {
         memset(OTA_Info.OTA_Ver, 0, sizeof(OTA_Info.OTA_Ver));
-        memcpy(OTA_Info.OTA_Ver, data, len);
+        memcpy(OTA_Info.OTA_Ver, data, 24);
         AT24C02_Write_OTASetting();
         printf("设置成功\r\n");
         Boot_Flag &= ~SET_VER_FLAG;
