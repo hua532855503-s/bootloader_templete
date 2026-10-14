@@ -9,6 +9,17 @@
 #include <string.h>
 load_a load_A;
 extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
+static const char* const msg[] = {
+  "\r\n[1]擦除A区\r\n[2]串口IAP下载A区程序\r\n[3]设置OTA版本号\r\n[4]查询OTA版本号\r\n[5]向外部Flash下载程序\r\n[6]使用外部Flash内程序\r\n[7]重启\r\n",
+  "擦除A区\r\n",
+  "通过Xmodem协议，串口IAP下载A区程序，请使用bin文件\r\n",
+  "设置OTA版本号，输入格式为VER-x.x.x-xxxx/xx/xx-xx:xx\r\n",
+  "版本号: ",
+  "向外部Flash下载程序，输入需要使用的块文件(1~9)\r\n",
+  "使用外部Flash内程序，输入需要使用的块文件(1~9)\r\n",
+  "重启\r\n",
+  "输入错误，请输入1~9\r\n"
+};
 
 /* 将一页或最后不足一页的升级数据写入目标存储区。 */
 static void Xmodem_Write(uint32_t offset, uint32_t length)
@@ -127,14 +138,7 @@ uint8_t Bootloader_Enter(uint8_t timeout)
 void Bootloader_Info(void)
 {
   /* 显示 Bootloader 当前支持的命令。 */
-  UART2_SendString("\r\n");
-  UART2_SendString("[1]擦除A区\r\n");
-  UART2_SendString("[2]串口IAP下载A区程序\r\n");
-  UART2_SendString("[3]设置OTA版本号\r\n");
-  UART2_SendString("[4]查询OTA版本号\r\n");
-  UART2_SendString("[5]向外部Flash下载程序\r\n");
-  UART2_SendString("[6]使用外部Flash内程序\r\n");
-  UART2_SendString("[7]重启\r\n");
+  UART2_SendString(msg[0]);
 }
 
 void LOAD_A(uint32_t addr)
@@ -171,15 +175,14 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
     /* 空闲状态下，单字节命令用于选择 Bootloader 功能。 */
     if (len == 1)
     {
+      UART2_SendString(msg[data[0] - '0']);
       switch (data[0])
       {
         case '1':
-          UART2_SendString("擦除A区\r\n");
           STM32_Erase_Flash(FLASH_PAGEB_NUMBER, FLASH_PAGEA_NUMBER);
           break;
         case '2':
           /* 擦除 A 区后进入 Xmodem 接收状态。 */
-          UART2_SendString("通过Xmodem协议，串口IAP下载A区程序，请使用bin文件\r\n");
           STM32_Erase_Flash(FLASH_PAGEB_NUMBER, FLASH_PAGEA_NUMBER);
           Boot_Flag |= (IAP_XMODEMC_FLAG|IAP_XMODEMD_FLAG);
           Update_Info.Xmodem_Timer = 0;
@@ -187,30 +190,25 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
           break;
         case '3':
           /* 后续固定长度字符串将作为 OTA 版本号处理。 */
-          UART2_SendString("设置OTA版本号，输入格式为VER-x.x.x-xxxx/xx/xx-xx:xx\r\n");
           Boot_Flag |= SET_VER_FLAG;
           break;
         case '4':
           AT24C02_Read_OTASetting();
-          UART2_SendString("版本号: ");
           UART2_SendString((const char *)OTA_Info.OTA_Ver);
           UART2_SendString("\r\n");
           Bootloader_Info();
           break;
         case '5':
           /* 先选择外部 Flash 块，再开始 Xmodem 接收。 */
-          UART2_SendString("向外部Flash下载程序，输入需要使用的块文件(1~9)\r\n");
           Boot_Flag |= OUTFLASH_DOWNLOAD_FLAG;
           Update_Info.Xmodem_Timer = 0;
           Update_Info.Xmodem_Num = 0;
           break;
         case '6':
           /* 选择外部 Flash 中已有的文件，随后复制到 A 区。 */
-          UART2_SendString("使用外部Flash内程序，输入需要使用的块文件(1~9)\r\n");
           Boot_Flag |= FLASH_DOWNLOAD_FLAG;
           break;
         case '7':
-          UART2_SendString("重启\r\n");
           Delay_ms(100);
           NVIC_SystemReset();
           break;
@@ -291,7 +289,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
       }
       else
       {
-        UART2_SendString("版本号格式错误\r\n");
+        UART2_SendString(msg[8]);
       }
     }
   }
@@ -313,7 +311,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
     }
     else
     {
-      UART2_SendString("输入错误，请输入1~9\r\n");
+      UART2_SendString(msg[8]);
     }
   }
   else if (Boot_Flag & FLASH_DOWNLOAD_FLAG)
@@ -327,7 +325,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
     }
     else
     {
-      UART2_SendString("输入错误，请输入1~9\r\n");
+      UART2_SendString(msg[8]);
     }
   }
 }
