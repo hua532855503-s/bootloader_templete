@@ -75,7 +75,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 #define FLASH_START_ADDR              0x08000000
 #define FLASH_PAGE_NUMBER             64
-#define FLASH_PAGEB_NUMBER            13
+#define FLASH_PAGEB_NUMBER            24
 #define FLASH_PAGEA_NUMBER            (FLASH_PAGE_NUMBER - FLASH_PAGEB_NUMBER)
 /* B 区存放 Bootloader，A 区存放待启动的用户应用。 */
 #define FLASH_PAGEA_START_ADDR        (FLASH_START_ADDR + FLASH_PAGEB_NUMBER * FLASH_PAGE_SIZE)
@@ -83,9 +83,11 @@ void Error_Handler(void);
 #define OTA_SET_FLAG                  0xAABB1122
 #define OTA_SETTING_SIZE              sizeof(OTA_Setting)
 #define OTA_VERSION_INPUT_LEN         26
+#define OTA_INIT_VERSION              "VER-0.0.0-0000/00/00-00:00"
 
 #define XMODEM_ACK                    0x06
 #define XMODEM_NAK                    0x15
+#define XMODEM_CAN                    0x18
 #define XMODEM_DATA_SIZE              128U
 #define XMODEM_FRAME_SIZE             133U
 
@@ -97,6 +99,7 @@ void Error_Handler(void);
 #define OUTFLASH_DOWNLOAD_FLAG        0x00000010
 #define FLASH_DOWNLOAD_FLAG           0x00000020
 #define OUTFLASH_XMODEM_FLAG          0x00000040
+#define ESP8266_XMODEM_FLAG           0x00000080
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

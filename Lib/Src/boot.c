@@ -5,12 +5,13 @@
 #include "fmc.h"
 #include "at24c02.h"
 #include "w25q64.h"
+#include "esp8266.h"
 
 #include <string.h>
 load_a load_A;
 extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
 static const char* const msg[] = {
-  "\r\n[1]擦除A区\r\n[2]串口IAP下载A区程序\r\n[3]设置OTA版本号\r\n[4]查询OTA版本号\r\n[5]向外部Flash下载程序\r\n[6]使用外部Flash内程序\r\n[7]重启\r\n",
+  "\r\n[1]擦除A区\r\n[2]串口IAP下载A区程序\r\n[3]设置OTA版本号\r\n[4]查询OTA版本号\r\n[5]向外部Flash下载程序\r\n[6]使用外部Flash内程序\r\n[7]重启\r\n[8]使用wifi更新A区程序\r\n",
   "擦除A区\r\n",
   "通过Xmodem协议，串口IAP下载A区程序，请使用bin文件\r\n",
   "设置OTA版本号，输入格式为VER-x.x.x-xxxx/xx/xx-xx:xx\r\n",
@@ -18,6 +19,7 @@ static const char* const msg[] = {
   "向外部Flash下载程序，输入需要使用的块文件(1~9)\r\n",
   "使用外部Flash内程序，输入需要使用的块文件(1~9)\r\n",
   "重启\r\n",
+  "使用wifi更新A区程序\r\n",
   "输入错误，请输入1~9\r\n"
 };
 
@@ -59,7 +61,7 @@ static uint16_t Xmodem_CRC16(uint8_t *buf, uint16_t len)
   return crc;
 }
 
-/* 校验固定格式：VER-x.x.x-xx/xx/xx-xx:xx\r\n。 */
+/* 校验固定格式：VER-x.x.x-xxxx/xx/xx-xx:xx。 */
 static uint8_t Boot_IsValidVersion(const uint8_t *data, uint16_t len)
 {
   static const char pattern[] = "VER-0.0.0-0000/00/00-00:00";
@@ -70,7 +72,7 @@ static uint8_t Boot_IsValidVersion(const uint8_t *data, uint16_t len)
     return 0;
   }
 
-  for (i = 0; i < 24; i++)
+  for (i = 0; i < OTA_VERSION_INPUT_LEN; i++)
   {
     if (pattern[i] == '0')
     {
@@ -91,7 +93,8 @@ static uint8_t Boot_IsValidVersion(const uint8_t *data, uint16_t len)
 void Xmodem_Send_Cmd(uint8_t cmd)
 {
   /* 向上位机发送 ACK、NAK 等 Xmodem 控制字符。 */
-  HAL_UART_Transmit(&huart2, &cmd, 1, 1000);
+  UART_HandleTypeDef *uart = (Boot_Flag & ESP8266_XMODEM_FLAG) ? &huart1 : &huart2;
+  HAL_UART_Transmit(uart, &cmd, 1, 1000);
 }
 
 /* 上电后的入口：检测升级请求，否则尝试启动 A 区应用。 */
@@ -105,6 +108,7 @@ void Bootloader_Branch(void)
       UART2_SendString("OTA更新\r\n");
       Boot_Flag = UPDATEA_FLAG;
       Update_Info.W25Q64_Block = 0;
+      return;
     }
     else
     {
@@ -173,7 +177,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
   if (Boot_Flag == 0)
   {
     /* 空闲状态下，单字节命令用于选择 Bootloader 功能。 */
-    if (len == 1)
+    if (len == 1 && data[0] >= '1' && data[0] <= '8')
     {
       UART2_SendString(msg[data[0] - '0']);
       switch (data[0])
@@ -212,7 +216,10 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
           Delay_ms(100);
           NVIC_SystemReset();
           break;
-      }
+        case '8':
+          ESP8266_Download();
+          break;
+        }
     }
   }
   else if (Boot_Flag & IAP_XMODEMD_FLAG)
@@ -239,6 +246,15 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
       {
         const uint32_t packet_index = Update_Info.Xmodem_Num % packet_size;
 
+        if (Update_Info.Xmodem_Num >= (FLASH_PAGEA_NUMBER * FLASH_PAGE_SIZE) / XMODEM_DATA_SIZE ||
+           ((Boot_Flag & OUTFLASH_XMODEM_FLAG) && Update_Info.Xmodem_Num >= (64U * FLASH_PAGE_SIZE) / XMODEM_DATA_SIZE))
+        {
+          Xmodem_Send_Cmd(XMODEM_CAN);
+          Xmodem_Send_Cmd(XMODEM_CAN);
+          Boot_Flag &= ~(IAP_XMODEMC_FLAG | IAP_XMODEMD_FLAG);
+          return;
+        }
+
         Boot_Flag &= ~IAP_XMODEMC_FLAG;
         Update_Info.Xmodem_CRC = calculated_crc;
         memcpy(&Update_Info.Update_buf[packet_index * XMODEM_DATA_SIZE], &data[3], XMODEM_DATA_SIZE);
@@ -261,16 +277,21 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
       {
         Xmodem_Write((Update_Info.Xmodem_Num / packet_size) * FLASH_PAGE_SIZE, packets_in_page * XMODEM_DATA_SIZE);
       }
+      /* XMODEM 发送端只有收到 EOT 的 ACK 后才会结束传输。 */
+      Xmodem_Send_Cmd(XMODEM_ACK);
       Boot_Flag &= ~IAP_XMODEMD_FLAG;
-      if (Boot_Flag & OUTFLASH_XMODEM_FLAG)
+      if ((Boot_Flag & OUTFLASH_XMODEM_FLAG) && !(Boot_Flag & ESP8266_XMODEM_FLAG))
       {
         /* 外部 Flash 下载完成后保存文件大小，供后续 OTA 使用。 */
         Boot_Flag &= ~OUTFLASH_XMODEM_FLAG;
         OTA_Info.File_Size[Update_Info.W25Q64_Block] = Update_Info.Xmodem_Num * XMODEM_DATA_SIZE;
         AT24C02_Write_OTASetting();
       }
-      Delay_ms(100);
-      NVIC_SystemReset();
+      if (!(Boot_Flag & ESP8266_XMODEM_FLAG))
+      {
+        Delay_ms(100);
+        NVIC_SystemReset();
+      }
     }
   }
   else if (Boot_Flag & SET_VER_FLAG)
@@ -289,7 +310,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
       }
       else
       {
-        UART2_SendString(msg[8]);
+        UART2_SendString("版本号格式错误\r\n");
       }
     }
   }
@@ -311,7 +332,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
     }
     else
     {
-      UART2_SendString(msg[8]);
+      UART2_SendString(msg[9]);
     }
   }
   else if (Boot_Flag & FLASH_DOWNLOAD_FLAG)
@@ -325,7 +346,7 @@ void Bootloader_Event(uint8_t *data, uint16_t len)
     }
     else
     {
-      UART2_SendString(msg[8]);
+      UART2_SendString(msg[9]);
     }
   }
 }
@@ -368,6 +389,11 @@ void Bootloader_Process_Byte(uint8_t byte)
   if (Boot_Flag & SET_VER_FLAG)
   {
     /* 版本号没有换行依赖，收满规定长度后再进行格式校验。 */
+    if (byte == '\r' || byte == '\n')
+    {
+      return;
+    }
+
     uart_frame[uart_frame_len++] = byte;
     if (uart_frame_len == OTA_VERSION_INPUT_LEN)
     {

@@ -43,7 +43,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+extern DMA_HandleTypeDef hdma_usart1_rx;
 extern DMA_HandleTypeDef hdma_usart2_rx;
+extern uint8_t UART1_RX_BUF[UART_RX_SIZE];
 extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
 /* USER CODE END PD */
 
@@ -57,7 +59,7 @@ extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
 /* USER CODE BEGIN PV */
 OTA_Setting OTA_Info;
 Update_Setting Update_Info;
-uint32_t Boot_Flag;  /* Bootloader 当前工作状态标志。 */
+uint32_t Boot_Flag;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -103,15 +105,24 @@ int main(void)
   MX_DMA_Init();
   MX_USART2_UART_Init();
   MX_SPI1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   DWT_Init();
-  UART2_RX_PtrInit();
+  UART_RX_PtrInit();
   IIC_Init();
   W25Q64_Init();
   /* 从 AT24C02 读取 OTA 标志、版本号和各文件大小。 */
   AT24C02_Read_OTASetting();
+  if (OTA_Info.OTA_Flag != OTA_SET_FLAG)
+  {
+    /* 未设置 OTA 标志时，写入默认版本号。 */
+    memcpy(OTA_Info.OTA_Ver, OTA_INIT_VERSION, 26);
+    AT24C02_Write_OTASetting();
+  }
   
   /* 使用 DMA 循环接收串口数据，关闭半传输中断避免无用中断。 */
+  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, UART1_RX_BUF, UART_RX_SIZE);
+  __HAL_DMA_DISABLE_IT(&hdma_usart1_rx, DMA_IT_HT);
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, UART2_RX_BUF, UART_RX_SIZE);
   __HAL_DMA_DISABLE_IT(&hdma_usart2_rx, DMA_IT_HT);
 

@@ -32,19 +32,24 @@ extern "C" {
 #include <string.h>
 /* USER CODE END Includes */
 
+extern UART_HandleTypeDef huart1;
+
 extern UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN Private defines */
 #define UART_RX_SIZE  2048
 
 extern uint8_t UART2_RX_BUF[UART_RX_SIZE];
+extern uint8_t UART1_RX_BUF[UART_RX_SIZE];
 /* USER CODE END Private defines */
 
+void MX_USART1_UART_Init(void);
 void MX_USART2_UART_Init(void);
 
 /* USER CODE BEGIN Prototypes */
-void UART2_RX_PtrInit(void);
+void UART_RX_PtrInit(void);
 uint16_t UART2_RX_Read(uint8_t *data, uint16_t max_len);
+uint16_t UART1_RX_Read(uint8_t *data, uint16_t max_len);
 void UART2_SendString(const char *str);
 void UART2_SendU32(uint32_t value);
 /* USER CODE END Prototypes */

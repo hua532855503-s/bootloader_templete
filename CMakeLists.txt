@@ -51,6 +51,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Lib/Src/w25q64.c
     Lib/Src/fmc.c
     Lib/Src/boot.c
+    Lib/Src/esp8266.c
 )
 
 # Add include paths
