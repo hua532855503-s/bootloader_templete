@@ -103,6 +103,12 @@ uint8_t ESP8266_Init(void)
     return 0;
   }
 
+  /* 查看当前配置。 */
+  if (!ESP8266_Send_Cmd("AT+GetConfig\r\n", "OK"))
+  {
+    return 0;
+  }
+
   return 1;
 }
 
