@@ -113,10 +113,11 @@ int main(void)
   W25Q64_Init();
   /* 从 AT24C02 读取 OTA 标志、版本号和各文件大小。 */
   AT24C02_Read_OTASetting();
-  if (OTA_Info.OTA_Flag != OTA_SET_FLAG)
+  if (OTA_Info.OTA_Flag == 0xFFFFFFFFU)
   {
-    /* 未设置 OTA 标志时，写入默认版本号。 */
-    memcpy(OTA_Info.OTA_Ver, OTA_INIT_VERSION, 26);
+    /* EEPROM 处于擦除态时写入初始版本号，后续启动不再覆盖用户版本。 */
+    memset(&OTA_Info, 0, OTA_SETTING_SIZE);
+    memcpy(OTA_Info.OTA_Ver, OTA_INIT_VERSION, OTA_VERSION_INPUT_LEN);
     AT24C02_Write_OTASetting();
   }
   
