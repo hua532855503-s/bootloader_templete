@@ -100,21 +100,21 @@ void Xmodem_Send_Cmd(uint8_t cmd)
 /* 上电后的入口：检测升级请求，否则尝试启动 A 区应用。 */
 void Bootloader_Branch(void)
 {
+  if (OTA_Info.OTA_Flag == OTA_SET_FLAG)
+  {
+    /* 设置了 OTA 标志时，跳过命令行等待，优先应用外部 Flash 固件。 */
+    UART2_SendString("OTA更新\r\n");
+    Boot_Flag = UPDATEA_FLAG;
+    Update_Info.W25Q64_Block = 0;
+    return;
+  }
+
   if (Bootloader_Enter(20) == 0)
   {
-    if (OTA_Info.OTA_Flag == OTA_SET_FLAG)
-    {
-      /* 设置了 OTA 标志时，优先从外部 Flash 选择的文件启动升级。 */
-      UART2_SendString("OTA更新\r\n");
-      Boot_Flag = UPDATEA_FLAG;
-      Update_Info.W25Q64_Block = 0;
-      return;
-    }
-    else
-    {
-      LOAD_A(FLASH_PAGEA_START_ADDR);
-    }
+    LOAD_A(FLASH_PAGEA_START_ADDR);
+    return;
   }
+
   UART2_SendString("进入bootloader命令行\r\n");
   Bootloader_Info();
 }
