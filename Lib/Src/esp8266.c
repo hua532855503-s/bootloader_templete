@@ -94,11 +94,11 @@ uint8_t ESP8266_Init(void)
   }
   
   /* 配置版本信息和固件文件的下载地址。 */
-  if (!ESP8266_Send_Cmd("AT+SetVerUrl=http://10.117.18.10:8081/version.txt\r\n", "OK"))
+  if (!ESP8266_Send_Cmd("AT+SetVerUrl=http://10.117.18.62:8081/version.txt\r\n", "OK"))
   {
     return 0;
   }
-  if (!ESP8266_Send_Cmd("AT+SetFwUrl=http://10.117.18.10:8081/LED.bin\r\n", "OK"))
+  if (!ESP8266_Send_Cmd("AT+SetFwUrl=http://10.117.18.62:8081/LED.bin\r\n", "OK"))
   {
     return 0;
   }

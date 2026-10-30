@@ -75,7 +75,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 #define FLASH_START_ADDR              0x08000000
 #define FLASH_PAGE_NUMBER             64
-#define FLASH_PAGEB_NUMBER            24
+#define FLASH_PAGEB_NUMBER            15
 #define FLASH_PAGEA_NUMBER            (FLASH_PAGE_NUMBER - FLASH_PAGEB_NUMBER)
 /* B 区存放 Bootloader，A 区存放待启动的用户应用。 */
 #define FLASH_PAGEA_START_ADDR        (FLASH_START_ADDR + FLASH_PAGEB_NUMBER * FLASH_PAGE_SIZE)

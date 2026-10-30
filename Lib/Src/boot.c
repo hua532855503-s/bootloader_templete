@@ -112,7 +112,6 @@ void Bootloader_Branch(void)
   if (Bootloader_Enter(20) == 0)
   {
     LOAD_A(FLASH_PAGEA_START_ADDR);
-    return;
   }
 
   UART2_SendString("进入bootloader命令行\r\n");
